@@ -1,0 +1,336 @@
+"use client";
+
+import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { THEMES, THEME_KEYS } from "@/lib/community-themes";
+import { cn } from "@/lib/utils";
+import { Settings } from "lucide-react";
+import { useTheme } from "next-themes";
+import type React from "react";
+import { createContext, useContext, useEffect, useState } from "react";
+
+export const VARIANT = ["success", "degraded", "error", "info"] as const;
+export type VariantType = (typeof VARIANT)[number];
+
+export const CARD_TYPE = [
+  "duration",
+  "requests",
+  "dominant",
+  "manual",
+] as const;
+export type CardType = (typeof CARD_TYPE)[number];
+
+export const BAR_TYPE = ["absolute", "dominant", "manual"] as const;
+export type BarType = (typeof BAR_TYPE)[number];
+
+export const COMMUNITY_THEME = THEME_KEYS;
+export type CommunityTheme = (typeof COMMUNITY_THEME)[number];
+
+export const RADIUS = ["square", "rounded"] as const;
+export type Radius = (typeof RADIUS)[number];
+interface StatusPageContextType {
+  cardType: CardType;
+  setCardType: (cardType: CardType) => void;
+  barType: BarType;
+  setBarType: (barType: BarType) => void;
+  showUptime: boolean;
+  setShowUptime: (showUptime: boolean) => void;
+  communityTheme: CommunityTheme;
+  setCommunityTheme: (communityTheme: CommunityTheme) => void;
+  radius: Radius;
+  setRadius: (radius: Radius) => void;
+}
+
+const StatusPageContext = createContext<StatusPageContextType | null>(null);
+
+export function useStatusPage() {
+  const context = useContext(StatusPageContext);
+  if (!context) {
+    throw new Error("useStatusPage must be used within a StatusPageProvider");
+  }
+  return context;
+}
+
+export function StatusPageProvider({
+  children,
+  defaultCardType = "duration",
+  defaultBarType = "absolute",
+  defaultShowUptime = true,
+  defaultCommunityTheme = "default",
+  defaultRadius = "square",
+}: {
+  children: React.ReactNode;
+  defaultCardType?: CardType;
+  defaultBarType?: BarType;
+  defaultShowUptime?: boolean;
+  defaultCommunityTheme?: CommunityTheme;
+  defaultRadius?: Radius;
+}) {
+  const [cardType, setCardType] = useState<CardType>(defaultCardType);
+  const [barType, setBarType] = useState<BarType>(defaultBarType);
+  const [showUptime, setShowUptime] = useState<boolean>(defaultShowUptime);
+  const [radius, setRadius] = useState<Radius>(defaultRadius);
+  const { resolvedTheme } = useTheme();
+  const [communityTheme, setCommunityTheme] = useState<CommunityTheme>(
+    defaultCommunityTheme,
+  );
+
+  useEffect(() => {
+    const theme = resolvedTheme as "dark" | "light";
+    if (["dark", "light"].includes(theme)) {
+      Object.keys(THEMES[communityTheme][theme]).forEach((key) => {
+        const element = document.documentElement;
+        const value =
+          THEMES[communityTheme][theme][
+            key as keyof (typeof THEMES)[typeof communityTheme][typeof theme]
+          ];
+        if (value) {
+          element.style.setProperty(key, value as string);
+        }
+      });
+    }
+    if (communityTheme === "default") {
+      document.documentElement.removeAttribute("style");
+    }
+  }, [resolvedTheme, communityTheme]);
+
+  useEffect(() => {
+    const computedRadius = getComputedStyle(
+      document.documentElement,
+    ).getPropertyValue("--radius");
+    if (radius === "square" && computedRadius !== "0rem") {
+      document.documentElement.style.setProperty("--radius", "0rem");
+    } else if (radius === "rounded" && computedRadius !== "0.625rem") {
+      document.documentElement.style.setProperty("--radius", "0.625rem");
+    }
+  }, [radius]);
+
+  return (
+    <StatusPageContext.Provider
+      value={{
+        cardType,
+        setCardType,
+        barType,
+        setBarType,
+        showUptime,
+        setShowUptime,
+        communityTheme,
+        setCommunityTheme,
+        radius,
+        setRadius,
+      }}
+    >
+      <div
+        style={
+          communityTheme
+            ? (THEMES[communityTheme][
+                resolvedTheme as "dark" | "light"
+              ] as React.CSSProperties)
+            : undefined
+        }
+      >
+        {children}
+      </div>
+    </StatusPageContext.Provider>
+  );
+}
+
+export function FloatingButton({ className }: { className?: string }) {
+  const {
+    cardType,
+    setCardType,
+    barType,
+    setBarType,
+    showUptime,
+    setShowUptime,
+    communityTheme,
+    setCommunityTheme,
+    radius,
+    setRadius,
+  } = useStatusPage();
+  const [display, setDisplay] = useState(false);
+
+  useEffect(() => {
+    const enabled =
+      sessionStorage.getItem("status-page-configuration") === "true";
+    const host = window.location.host;
+    if (
+      (host.includes("localhost") ||
+        host.includes("stpg.dev") ||
+        host.includes("openstatus.dev") ||
+        host.includes("vercel.app")) &&
+      enabled
+    ) {
+      setDisplay(true);
+    } else if (process.env.NODE_ENV === "development") {
+      setDisplay(true);
+    }
+  }, []);
+
+  if (!display) return null;
+
+  return (
+    <div className={cn("fixed right-4 bottom-4 z-50", className)}>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            size="icon"
+            variant="outline"
+            className="size-12 rounded-full dark:bg-background"
+          >
+            <Settings className="size-5" />
+            <span className="sr-only">Open status page settings</span>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-80 p-0" align="end">
+          <div className="space-y-4 p-4">
+            <div className="space-y-2">
+              <h4 className="font-medium leading-none">Status Page Settings</h4>
+              <p className="text-muted-foreground text-sm">
+                Configure the status page appearance
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="show-uptime">Show Uptime</Label>
+                <Select
+                  value={showUptime ? "true" : "false"}
+                  onValueChange={(v) => setShowUptime(v === "true")}
+                >
+                  <SelectTrigger id="show-uptime" className="w-full capitalize">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["true", "false"].map((v) => (
+                      <SelectItem key={v} value={v} className="capitalize">
+                        {v}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bar-type">Bar Type</Label>
+                <Select
+                  value={barType}
+                  onValueChange={(v) => {
+                    setBarType(v as BarType);
+                    if (v !== "absolute") {
+                      setCardType(v as CardType);
+                    } else {
+                      setCardType("requests");
+                    }
+                  }}
+                >
+                  <SelectTrigger id="bar-type" className="w-full capitalize">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BAR_TYPE.map((v) => (
+                      <SelectItem key={v} value={v} className="capitalize">
+                        {v}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="card-type">Card Type</Label>
+                <Select
+                  value={cardType}
+                  onValueChange={(v) => setCardType(v as CardType)}
+                  disabled={barType !== "absolute"}
+                >
+                  <SelectTrigger id="card-type" className="w-full capitalize">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CARD_TYPE.map((v) => (
+                      <SelectItem
+                        key={v}
+                        value={v}
+                        className="capitalize"
+                        disabled={["dominant", "manual"].includes(v)}
+                      >
+                        {v}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="theme">Theme</Label>
+                <ThemeToggle id="theme" className="w-full" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="community-theme">Community Theme</Label>
+                <Select
+                  value={communityTheme}
+                  onValueChange={(v) => setCommunityTheme(v as CommunityTheme)}
+                >
+                  <SelectTrigger
+                    id="community-theme"
+                    className="w-full capitalize"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COMMUNITY_THEME.map((v) => (
+                      <SelectItem key={v} value={v} className="capitalize">
+                        {v}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="radius">Radius</Label>
+                <Select
+                  value={radius}
+                  onValueChange={(v) => setRadius(v as Radius)}
+                >
+                  <SelectTrigger id="radius" className="w-full capitalize">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RADIUS.map((v) => (
+                      <SelectItem key={v} value={v} className="capitalize">
+                        {v}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <Separator />
+          <div className="p-4">
+            <Button className="w-full" size="sm" asChild>
+              <a
+                href="https://github.com/openstatusHQ/openstatus-template"
+                target="_blank"
+                rel="noreferrer"
+              >
+                GitHub Repo
+              </a>
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@openstatus/notification-opsgenie",
+  "version": "0.0.0",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@openstatus/db": "workspace:*",
+    "@t3-oss/env-core": "0.7.1",
+    "@types/validator": "13.11.6",
+    "validator": "13.12.0",
+    "zod": "3.24.2"
+  },
+  "devDependencies": {
+    "@openstatus/tsconfig": "workspace:*",
+    "@types/node": "20.8.0",
+    "@types/react": "19.1.13",
+    "@types/react-dom": "19.1.9",
+    "typescript": "5.7.2"
+  }
+}
